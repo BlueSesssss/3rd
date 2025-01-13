@@ -2,16 +2,23 @@ const board = document.getElementById('board');
 const restartButton = document.getElementById('restart');
 const playerChoice = document.getElementById('player-choice');
 const modeSelect = document.getElementById('mode');
+let winnerDisplay = null;
 let cells = [];
 let currentPlayer = 'X';
 let playerSymbol = 'X';
 let botSymbol = 'O';
 let gameMode = '2player';
 
-// Initialize board
 function initializeBoard() {
   board.innerHTML = '';
   cells = Array(9).fill(null);
+  currentPlayer = playerSymbol;
+
+  if (winnerDisplay) {
+    winnerDisplay.remove();
+    winnerDisplay = null;
+  }
+
   for (let i = 0; i < 9; i++) {
     const cell = document.createElement('div');
     cell.classList.add('cell');
@@ -21,19 +28,18 @@ function initializeBoard() {
   }
 }
 
-// Handle cell click
 function handleCellClick(e) {
   const index = e.target.dataset.index;
   if (cells[index] || checkWinner()) return;
 
   cells[index] = currentPlayer;
   e.target.textContent = currentPlayer;
-  e.target.classList.add('taken');
+  e.target.classList.add('taken', currentPlayer);
 
   if (checkWinner()) {
-    setTimeout(() => alert(`${currentPlayer} wins!`), 100);
+    displayWinner(`${currentPlayer} wins!`);
   } else if (cells.every(cell => cell)) {
-    setTimeout(() => alert("It's a draw!"), 100);
+    displayWinner("It's a draw!");
   } else {
     switchPlayer();
     if (gameMode !== '2player' && currentPlayer === botSymbol) {
@@ -42,28 +48,35 @@ function handleCellClick(e) {
   }
 }
 
-// Switch player
+function displayWinner(message) {
+  winnerDisplay = document.createElement('div');
+  winnerDisplay.classList.add('winner');
+  winnerDisplay.textContent = message;
+  document.querySelector('.container').appendChild(winnerDisplay);
+}
+
 function switchPlayer() {
   currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
 }
 
-// Bot move
 function botMove() {
   let index;
   if (gameMode === 'easy') {
     do {
       index = Math.floor(Math.random() * 9);
     } while (cells[index]);
+  } else if (gameMode === 'hard') {
+    index = findWinnableMove() || getRandomMove();
   } else {
-    index = findBestMove(gameMode === 'impossible');
+    index = findBestMove();
   }
+
   if (index !== null) {
     const cell = board.querySelector(`.cell[data-index='${index}']`);
     cell.click();
   }
 }
 
-// Check winner
 function checkWinner() {
   const winningCombinations = [
     [0, 1, 2],
@@ -82,15 +95,33 @@ function checkWinner() {
   });
 }
 
-// Minimax Algorithm for "Impossible" Level
-function findBestMove(isImpossible) {
+function findWinnableMove() {
+  for (let i = 0; i < cells.length; i++) {
+    if (!cells[i]) {
+      cells[i] = botSymbol;
+      if (checkWinner()) {
+        cells[i] = null;
+        return i;
+      }
+      cells[i] = null;
+    }
+  }
+  return null;
+}
+
+function getRandomMove() {
+  const emptyCells = cells.map((cell, idx) => (cell ? null : idx)).filter(idx => idx !== null);
+  return emptyCells.length ? emptyCells[Math.floor(Math.random() * emptyCells.length)] : null;
+}
+
+function findBestMove() {
   let bestScore = -Infinity;
   let move = null;
 
   for (let i = 0; i < cells.length; i++) {
     if (!cells[i]) {
       cells[i] = botSymbol;
-      let score = minimax(cells, 0, false, isImpossible);
+      const score = minimax(cells, 0, false);
       cells[i] = null;
       if (score > bestScore) {
         bestScore = score;
@@ -101,7 +132,7 @@ function findBestMove(isImpossible) {
   return move;
 }
 
-function minimax(board, depth, isMaximizing, isImpossible) {
+function minimax(board, depth, isMaximizing) {
   if (checkWinner()) return isMaximizing ? -10 : 10;
   if (board.every(cell => cell)) return 0;
 
@@ -110,7 +141,7 @@ function minimax(board, depth, isMaximizing, isImpossible) {
     for (let i = 0; i < board.length; i++) {
       if (!board[i]) {
         board[i] = botSymbol;
-        let score = minimax(board, depth + 1, false, isImpossible);
+        let score = minimax(board, depth + 1, false);
         board[i] = null;
         bestScore = Math.max(score, bestScore);
       }
@@ -121,7 +152,7 @@ function minimax(board, depth, isMaximizing, isImpossible) {
     for (let i = 0; i < board.length; i++) {
       if (!board[i]) {
         board[i] = playerSymbol;
-        let score = minimax(board, depth + 1, true, isImpossible);
+        let score = minimax(board, depth + 1, true);
         board[i] = null;
         bestScore = Math.min(score, bestScore);
       }
@@ -130,17 +161,11 @@ function minimax(board, depth, isMaximizing, isImpossible) {
   }
 }
 
-// Restart game
-restartButton.addEventListener('click', () => {
-  currentPlayer = playerSymbol;
-  initializeBoard();
-});
+restartButton.addEventListener('click', initializeBoard);
 
-// Update settings
 playerChoice.addEventListener('change', e => {
   playerSymbol = e.target.value;
   botSymbol = playerSymbol === 'X' ? 'O' : 'X';
-  currentPlayer = playerSymbol;
   initializeBoard();
 });
 
@@ -149,5 +174,4 @@ modeSelect.addEventListener('change', e => {
   initializeBoard();
 });
 
-// Start game
 initializeBoard();
